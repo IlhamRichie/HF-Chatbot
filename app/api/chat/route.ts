@@ -1,29 +1,35 @@
-import { HfInference } from '@huggingface/inference';
 import { NextResponse } from 'next/server';
+import { Client } from "@gradio/client";
 
-// Inisialisasi client HF dengan token dari env
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
+// Opsional: Aktifkan runtime edge jika deploy di Vercel nanti
+// export const runtime = 'edge'; 
 
 export async function POST(req: Request) {
   try {
     const { message } = await req.json();
-
-    // Kita pakai model Mistral-7B yang populer dan ringan untuk chat
-    // Kamu bisa ganti model lain, misal: 'meta-llama/Llama-2-7b-chat-hf'
-    const response = await hf.textGeneration({
-      model: 'mistralai/Mistral-7B-Instruct-v0.2',
-      inputs: `<s>[INST] ${message} [/INST]`, // Format prompt khusus Mistral
-      parameters: {
-        max_new_tokens: 200, // Panjang jawaban
-        temperature: 0.7,    // Kreativitas (0 = kaku, 1 = kreatif)
-        return_full_text: false, // Hanya ambil jawaban baru
-      },
+    
+    // 1. Connect ke Space kamu
+    // Pastikan ini benar: "forti2026/chatbot-tegal-backend"
+    const client = await Client.connect("forti2026/chatbot-tegal-backend");
+    
+    // 2. Tembak API dengan nama yang BENAR
+    // Ganti "/predict" menjadi "/chat_logic" sesuai dokumentasi kamu
+    const result = await client.predict("/chat_logic", { 
+      text: message, 
     });
 
-    return NextResponse.json({ reply: response.generated_text });
+    // 3. Ambil Hasilnya
+    // Gradio JS Client selalu mengembalikan data dalam bentuk Array
+    // Jadi kita ambil elemen pertama [0]
+    const botReply = (result.data as any[])[0];
 
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Gagal mengambil respon dari AI' }, { status: 500 });
+    return NextResponse.json({ reply: botReply });
+
+  } catch (error: any) {
+    console.error("🔥 Error Hugging Face:", error);
+    return NextResponse.json(
+      { error: `Gagal: ${error.message}` }, 
+      { status: 500 }
+    );
   }
 }
